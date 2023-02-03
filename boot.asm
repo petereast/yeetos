@@ -1,7 +1,16 @@
-ORG 0x7c00
+ORG 0
 BITS 16
 
 start:
+	cli  ; Clear interrupts, disable interrupts so we can change the segment registers
+	mov ax, 0x7c0 ; Can't move directly for some reason
+	mov ds, ax
+	mov es, ax
+	mov ax, 0x00 ; set stack register to 0x7c00
+	mov ss, ax
+	mov sp, 0x7c00
+	sti  ; Enables interrupts now that the segment registers are set
+
 	mov si, message ; move addr of message to si register
 	call print
 	call end
