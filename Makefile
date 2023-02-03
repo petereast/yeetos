@@ -3,3 +3,6 @@ boot:
 
 run:
 	qemu-system-x86_64 -hda ./boot.bin
+
+burn:
+	dd if=./boot.bin of=/output

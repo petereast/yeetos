@@ -1,8 +1,19 @@
 ORG 0
 BITS 16
 
+; BIOS parameter block, 33 bytes excluding shortjump
+_start:
+	jmp short start
+	nop
+
+times 33 db 0; Create 33 bytes for the BIOS parameter block
+
 start:
+	jmp 0x7c0:step2; set our code segment to 0x7c0
+
+step2:
 	cli  ; Clear interrupts, disable interrupts so we can change the segment registers
+	; Improves our changes 
 	mov ax, 0x7c0 ; Can't move directly for some reason
 	mov ds, ax
 	mov es, ax
