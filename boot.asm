@@ -12,17 +12,9 @@ start:
 	jmp 0x7c0:step2; set our code segment to 0x7c0
 
 handle_zero: ; div zero exception
-	mov ah, 0eh
-	mov al, 'A'
-	mov bx, 0x00
-	int 0x10
-	iret
-
-handle_one: ; div zero exception
-	mov ah, 0eh
-	mov al, 'A'
-	mov bx, 0x00
-	int 0x10
+	mov si, div_zero_message ; move addr of message to si register
+	call print
+	
 	iret
 
 step2:
@@ -38,14 +30,24 @@ step2:
 
 	mov word[ss:0x00], handle_zero ; Load the interrupt handler into the right place in the interrupt table
 	mov word[ss:0x02], 0x7c0 ; Segment in the interrupt table to do thing
-	mov word[ss:0x04], handle_zero ; Load the interrupt handler into the right place in the interrupt table
-	mov word[ss:0x06], 0x7c0 ; Segment in the interrupt table to do thing
 
-	mov ax 0x00
-	div ax
+	; BIOS supports disk operations in bios mode with int 13h
+	mov ah, 0x02 ; 02h?
+	mov al, 0x01 ; read one sector
+	; DL is already set to the drive number
+	; Data read into EX:BX
+	; CF set if error
+	mov ch, 0x00 ; cylinder 0
+	mov cl, 0x02 ; sector 2
+	mov dh, 0x00 ; head no
+	mov bx, buffer ; set buffer pointer
 
-	mov si, message ; move addr of message to si register
+	int 0x13
+	jc read_error ; If carry is set, jump to error
+
+	mov si, buffer
 	call print
+
 	call end
 
 print:
@@ -67,8 +69,15 @@ print_char:
 end:
 	jmp $
 
-message: db 'Hello world!', 0
+read_error:
+	mov si, error_message
+	call print
+	call end
+
+div_zero_message: db 'Computers cannot divide by zero!', 0
+error_message: db 'Unable to load sector!', 0
 
 times 510-($ - $$) db 0 ; Fill at least 510 bytes of data
 dw 0xAA55
 
+buffer:  ; Won't be loaded because it's out of the boot sector
