@@ -1,11 +1,9 @@
 boot:
 	# Boot.bin is our virtual hard disk
-	nasm -f bin ./boot.asm -o ./boot.bin
-	dd if=./message.txt >> ./boot.bin
-	dd if=/dev/zero bs=512 count=1 >> ./boot.bin
+	nasm -f bin .src/boot/boot.asm -o ./bin/boot.bin
 
 run: boot
-	qemu-system-x86_64 -hda ./boot.bin -display "type=gtk,grab-on-hover=off"
+	qemu-system-x86_64 -hda ./bin/boot.bin -display "type=gtk,grab-on-hover=off"
 
-burn:
-	dd if=./boot.bin of=/output
+clean: 
+	rm -rf ./bin/boot.bin
