@@ -1,5 +1,8 @@
-ORG 0
+ORG 0x7c00
 BITS 16
+
+CODE_SEG equ gdt_code - gdt_start
+DATA_SEG equ gdt_data - gdt_start
 
 ; BIOS parameter block, 33 bytes excluding shortjump
 _start:
@@ -9,18 +12,12 @@ _start:
 times 33 db 0; Create 33 bytes for the BIOS parameter block
 
 start:
-	jmp 0x7c0:step2; set our code segment to 0x7c0
-
-handle_zero: ; div zero exception
-	mov si, div_zero_message ; move addr of message to si register
-	call print
-	
-	iret
+	jmp 0:step2; set our code segment to 0x7c0
 
 step2:
 	cli  ; Clear interrupts, disable interrupts so we can change the segment registers
 	; Improves our changes 
-	mov ax, 0x7c0 ; Can't move directly for some reason
+	mov ax, 0x00 ; Can't move directly for some reason
 	mov ds, ax
 	mov es, ax
 	mov ax, 0x00 ; set stack register to 0x7c00
@@ -31,51 +28,56 @@ step2:
 	mov word[ss:0x00], handle_zero ; Load the interrupt handler into the right place in the interrupt table
 	mov word[ss:0x02], 0x7c0 ; Segment in the interrupt table to do thing
 
-	; BIOS supports disk operations in bios mode with int 13h
-	mov ah, 0x02 ; 02h?
-	mov al, 0x01 ; read one sector
-	; DL is already set to the drive number
-	; Data read into EX:BX
-	; CF set if error
-	mov ch, 0x00 ; cylinder 0
-	mov cl, 0x02 ; sector 2
-	mov dh, 0x00 ; head no
-	mov bx, buffer ; set buffer pointer
+.load_protected:
+  cli
+  lgdt[gdt_descriptor] ; Loads descriptor table
+  mov eac, cr0
+  or eax, 0x1
+  mov cr0, eax
+  jmp CODE_SEG:load32
 
-	int 0x13
-	jc read_error ; If carry is set, jump to error
+  ; Create global descriptor table
 
-	mov si, buffer
-	call print
+
+  ; This is going to use the paging memory scheme
+
+  ; Write a 32 bit kernel
 
 	call end
 
-print:
-	mov bx, 0   ; set bg to 0
-.loop:
-	lodsb  	; load chars of si register into al register, incr si register
-	cmp al, 0 ; if the char is null
-	je .done ; jump if true
-	call print_char
-	jmp .loop
-.done:
-	ret
 
-print_char:
-	mov ah, 0eh ; 0eh is command to print char
-	int 0x10    ; bios interrupt, prints char in AL register
-	ret         ; retrurn to caller
+; GDT - see https://wiki.osdev.org/Global_Descriptor_Table
+gdt_start:
+gdt_null:
+  dd 0x0
+  dd 0x0
 
-end:
-	jmp $
+; offset 0x8
+gdt_code: ; CS Should point to this
+  dw 0xffff ; Segment limit first 0-15 bits
+  dw 0x0    ; Base first 0-15 bits
+  db 0      ; Base 16-23 bits
+  db 0x9a   ; Access byte
+  db 11001111b ; High 4 bit flag and low 4 bit flags
+  db 0      ; base 21-34 bits.
 
-read_error:
-	mov si, error_message
-	call print
-	call end
+; offset 0x10
+gdt_data: ; DS, SS, ES, FS, GS should point to this
+  dw 0xffff ; Segment limit first 0-15 bits
+  dw 0x0    ; Base first 0-15 bits
+  db 0      ; Base 16-23 bits
+  db 0x92   ; Access byte
+  db 11001111b ; High 4 bit flag and low 4 bit flags
+  db 0      ; base 21-34 bits.
 
-div_zero_message: db 'Computers cannot divide by zero!', 0
-error_message: db 'Unable to load sector!', 0
+gdt_end:
+gdt_descriptor:
+  dw gdw_end - gdt_start-1
+  dd gdt_start
+
+[BITS 32]
+load32:
+  jmp $
 
 times 510-($ - $$) db 0 ; Fill at least 510 bytes of data
 dw 0xAA55
