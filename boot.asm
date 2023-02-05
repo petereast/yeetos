@@ -25,25 +25,17 @@ step2:
 	mov sp, 0x7c00
 	sti  ; Enables interrupts now that the segment registers are set
 
-	mov word[ss:0x00], handle_zero ; Load the interrupt handler into the right place in the interrupt table
-	mov word[ss:0x02], 0x7c0 ; Segment in the interrupt table to do thing
-
 .load_protected:
-  cli
-  lgdt[gdt_descriptor] ; Loads descriptor table
-  mov eac, cr0
-  or eax, 0x1
-  mov cr0, eax
-  jmp CODE_SEG:load32
+	cli
+	lgdt[gdt_descriptor] ; Loads descriptor table
+	mov eax, cr0
+	or eax, 0x1
+	mov cr0, eax
+	jmp CODE_SEG:load32
 
   ; Create global descriptor table
-
-
   ; This is going to use the paging memory scheme
-
   ; Write a 32 bit kernel
-
-	call end
 
 
 ; GDT - see https://wiki.osdev.org/Global_Descriptor_Table
@@ -72,12 +64,21 @@ gdt_data: ; DS, SS, ES, FS, GS should point to this
 
 gdt_end:
 gdt_descriptor:
-  dw gdw_end - gdt_start-1
+  dw gdt_end - gdt_start-1
   dd gdt_start
 
 [BITS 32]
 load32:
-  jmp $
+	mov ax, DATA_SEG
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
+	mov ebp, 0x00200000
+	mov esp, ebp
+
+	jmp $
 
 times 510-($ - $$) db 0 ; Fill at least 510 bytes of data
 dw 0xAA55
